@@ -1,0 +1,12 @@
+langchain==0.1.20
+langchain-openai==0.1.8
+openai==1.28.1
+python-dotenv==1.0.0
+pydantic==2.6.4
+aiohttp==3.9.3
+requests==2.31.0
+sqlalchemy==2.0.25
+pysqlite3==2.6.0
+pytest==7.4.4
+pytest-asyncio==0.23.3
+loguru==0.7.2
