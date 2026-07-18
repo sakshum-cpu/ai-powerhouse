@@ -1,48 +1,39 @@
 """Example: Using the Autonomous Agent"""
 from agent.agent import Agent
-from utils.logger import get_logger
-import json
-
-logger = get_logger(__name__)
-
 
 def main():
-    """Run agent example"""
-    logger.info("=" * 50)
-    logger.info("AI Powerhouse - Agent Example")
-    logger.info("=" * 50)
+    print("\n🤖 NEURON Autonomous Agent Example")
+    print("=" * 50)
     
-    # Initialize agent
-    agent = Agent(name="TaskBot")
+    # Create agent
+    agent = Agent(name="TaskMaster")
     
-    # Example tasks
-    tasks = [
-        "Calculate the sum of 15 and 25",
-        "Find information about Python programming",
-    ]
+    # Show available tools
+    print("\n🔧 Available Tools:")
+    tools = agent.get_available_tools()
+    for tool, desc in tools.items():
+        print(f"  - {tool}: {desc}")
     
-    for task in tasks:
-        logger.info(f"\nExecuting task: {task}")
-        try:
-            result = agent.execute_task(task)
-            
-            logger.info(f"Status: {result['status']}")
-            logger.info(f"Steps executed: {len(result['steps_executed'])}")
-            logger.info(f"Final result: {result['final_result'][:100]}...")
-        except Exception as e:
-            logger.error(f"Error: {str(e)}")
+    # Execute a complex task
+    task = "Calculate 100 + 50, then check if the result is prime, then generate 5 random numbers"
     
-    # Print execution history
-    logger.info(f"\nExecution History:")
-    history = agent.get_history()
-    logger.info(f"Total executions: {len(history)}")
+    print(f"\n📋 Task: {task}")
+    print("\n⚙️  Executing task...")
     
-    # Print available tools
-    logger.info(f"\nAvailable Tools:")
-    tools = agent.tools.get_tools()
-    for tool in tools:
-        logger.info(f"  - {tool['name']}: {tool['description']}")
-
+    try:
+        result = agent.execute_task(task)
+        
+        print(f"\n✅ Task Status: {result['status']}")
+        print(f"Steps Executed: {result['steps_executed']}")
+        
+        print("\n📝 Execution Plan:")
+        for i, step in enumerate(result['results'], 1):
+            print(f"  Step {i}: {step['description']}")
+    
+    except Exception as e:
+        print(f"Error: {str(e)}")
+    
+    print("\n✅ Agent example completed!\n")
 
 if __name__ == "__main__":
     main()

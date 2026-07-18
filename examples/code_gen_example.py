@@ -1,80 +1,54 @@
 """Example: Using the Code Generator"""
 from code_generator.generator import CodeGenerator
-from code_generator.validator import CodeValidator
-from code_generator.executor import CodeExecutor
-from utils.logger import get_logger
-
-logger = get_logger(__name__)
-
 
 def main():
-    """Run code generator example"""
-    logger.info("=" * 50)
-    logger.info("AI Powerhouse - Code Generator Example")
-    logger.info("=" * 50)
+    print("\n💻 NEURON Code Generator Example")
+    print("=" * 50)
     
-    # Initialize components
-    generator = CodeGenerator()
-    validator = CodeValidator()
-    executor = CodeExecutor()
+    # Create code generator
+    gen = CodeGenerator()
     
-    # Example code generation requests
-    prompts = [
-        ("Create a function that calculates Fibonacci numbers", "python"),
-        ("Create a function to check if a number is prime", "python"),
-    ]
+    # Example 1: Generate simple function
+    print("\n📝 Example 1: Generate a palindrome checker function")
+    description1 = "Create a function that checks if a number is a palindrome"
     
-    for description, language in prompts:
-        logger.info(f"\nGenerating {language} code: {description}")
+    try:
+        result1 = gen.generate(description1, language="python")
         
-        try:
-            # Generate code
-            result = generator.generate(description, language=language)
-            code = result["code"]
-            
-            logger.info(f"\nGenerated Code:")
-            logger.info(f"""```{language}
-{code}
-```""")
-            
-            # Validate code
-            if language == "python":
-                is_valid, issues = validator.validate_python(code)
-                logger.info(f"\nValidation: {'✓ Valid' if is_valid else '✗ Invalid'}")
-                if issues:
-                    for issue in issues:
-                        logger.warning(f"  - {issue['message']}")
-                
-                # Check security
-                is_safe, security_issues = validator.check_security(code)
-                logger.info(f"Security: {'✓ Safe' if is_safe else '⚠ Warning'}")
-                if security_issues:
-                    for issue in security_issues:
-                        logger.warning(f"  - {issue['message']}")
-                
-                # Check quality
-                metrics = validator.check_quality(code)
-                logger.info(f"Quality Metrics:")
-                for key, value in metrics.items():
-                    logger.info(f"  - {key}: {value}")
-                
-                # Execute code (if safe)
-                if is_safe and is_valid:
-                    logger.info(f"\nExecuting code...")
-                    exec_result = executor.execute(code, language)
-                    logger.info(f"Status: {exec_result['status']}")
-                    if exec_result['output']:
-                        logger.info(f"Output:\n{exec_result['output']}")
-                    if exec_result['error']:
-                        logger.error(f"Error:\n{exec_result['error']}")
-        except Exception as e:
-            logger.error(f"Error: {str(e)}")
+        print(f"\n✅ Generated Code (Valid: {result1['valid']}):")
+        print("-" * 40)
+        print(result1['code'])
+        print("-" * 40)
+        
+        if result1['validation']['security_issues']:
+            print(f"⚠️  Security Issues: {result1['validation']['security_issues']}")
     
-    # Print generation history
-    logger.info(f"\nGeneration History:")
-    history = generator.get_history()
-    logger.info(f"Total generated: {len(history)}")
-
+    except Exception as e:
+        print(f"Error: {str(e)}")
+    
+    # Example 2: Generate and execute
+    print("\n\n📝 Example 2: Generate and execute a sorting function")
+    description2 = "Write a function to sort a list of numbers in ascending order"
+    
+    try:
+        result2 = gen.generate_and_execute(description2, language="python")
+        
+        print(f"\n✅ Generated & Executed (Valid: {result2['valid']}):")
+        print("-" * 40)
+        print(result2['code'])
+        print("-" * 40)
+        
+        if result2['valid']:
+            exec_result = result2.get('execution', {})
+            if exec_result.get('success'):
+                print(f"\n✅ Execution Output:\n{exec_result['output']}")
+            else:
+                print(f"\n❌ Execution Error: {exec_result.get('error')}")
+    
+    except Exception as e:
+        print(f"Error: {str(e)}")
+    
+    print("\n✅ Code Generator example completed!\n")
 
 if __name__ == "__main__":
     main()

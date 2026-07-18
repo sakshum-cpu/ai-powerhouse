@@ -1,101 +1,74 @@
-"""Safe code execution"""
-from typing import Optional, Dict, Any
-import subprocess
-import tempfile
-import os
-from utils.logger import get_logger
-from utils.errors import CodeExecutionError
+"""Safe code execution for code generator"""
+import sys
+from io import StringIO
+from typing import Dict, Any
 from config import settings
+from utils.logger import get_logger
+from utils.errors import ExecutionError, SecurityError
 
 logger = get_logger(__name__)
-
 
 class CodeExecutor:
     """Executes generated code safely"""
     
-    LANGUAGE_COMMANDS = {
-        "python": "python",
-        "javascript": "node",
-        "java": "java",
-        "go": "go run",
-        "rust": "rustc",
-    }
-    
-    LANGUAGE_EXTENSIONS = {
-        "python": ".py",
-        "javascript": ".js",
-        "java": ".java",
-        "go": ".go",
-        "rust": ".rs",
-    }
-    
-    def __init__(self, sandbox: bool = True):
-        """Initialize code executor
-        
-        Args:
-            sandbox: Whether to use sandbox (limited by timeout)
-        """
-        self.sandbox = sandbox
+    def __init__(self):
+        """Initialize executor"""
         self.timeout = settings.code_gen_timeout
+        self.sandbox = settings.code_gen_sandbox
     
-    def execute(
-        self,
-        code: str,
-        language: str = "python",
-    ) -> Dict[str, Any]:
-        """Execute code safely
-        
-        Args:
-            code: Code to execute
-            language: Programming language
-            
-        Returns:
-            Execution result with output/errors
-            
-        Raises:
-            CodeExecutionError: If execution fails
-        """
-        if language not in self.LANGUAGE_COMMANDS:
-            raise CodeExecutionError(f"Unsupported language: {language}")
-        
+    def execute_python(self, code: str) -> Dict[str, Any]:
+        """Execute Python code safely"""
         try:
-            result = {
-                "language": language,
-                "code": code,
-                "output": "",
-                "error": "",
-                "status": "unknown",
+            # Capture output
+            old_stdout = sys.stdout
+            sys.stdout = StringIO()
+            
+            # Create safe environment
+            safe_dict = {
+                "__builtins__": {
+                    "print": print,
+                    "len": len,
+                    "range": range,
+                    "list": list,
+                    "dict": dict,
+                    "str": str,
+                    "int": int,
+                    "float": float,
+                    "sum": sum,
+                    "max": max,
+                    "min": min,
+                }
             }
             
-            # Create temporary file
-            ext = self.LANGUAGE_EXTENSIONS[language]
-            with tempfile.NamedTemporaryFile(mode='w', suffix=ext, delete=False) as f:
-                f.write(code)
-                temp_file = f.name
+            # Execute code
+            exec(code, safe_dict)
             
-            try:
-                # Build command
-                cmd = f"{self.LANGUAGE_COMMANDS[language]} {temp_file}"
-                
-                # Execute with timeout
-                process = subprocess.run(
-                    cmd,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=self.timeout,
-                )
-                
-                result["output"] = process.stdout
-                result["error"] = process.stderr
-                result["status"] = "success" if process.returncode == 0 else "failed"
-                
-                logger.info(f"Code executed: {language} - Status: {result['status']}")
-                return result
-            finally:
-                # Clean up temp file
-                os.unlink(temp_file)
-        except subprocess.TimeoutExpired:
-            raise CodeExecutionError(f"Code execution timeout (>{self.timeout}s)")
+            # Get output
+            output = sys.stdout.getvalue()
+            sys.stdout = old_stdout
+            
+            logger.info("Code executed successfully")
+            return {
+                "success": True,
+                "output": output,
+                "error": None
+            }
+            
         except Exception as e:
-            raise CodeExecutionError(f"Code execution failed: {str(e)}")
+            sys.stdout = old_stdout
+            logger.error(f"Execution error: {str(e)}")
+            return {
+                "success": False,
+                "output": "",
+                "error": str(e)
+            }
+    
+    def execute(self, code: str, language: str = "python") -> Dict[str, Any]:
+        """Execute code"""
+        if language == "python":
+            return self.execute_python(code)
+        
+        return {
+            "success": False,
+            "error": f"Execution not supported for {language}"
+        }

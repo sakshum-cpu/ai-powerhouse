@@ -1,145 +1,80 @@
-"""Code generation functionality"""
-from typing import Optional, Dict, Any
-from utils.llm import get_llm_manager
+"""Code Generator implementation"""
+from typing import Dict, Any, Optional
+from code_generator.validator import CodeValidator
+from code_generator.executor import CodeExecutor
+from utils.llm import get_llm
 from utils.logger import get_logger
-from utils.errors import CodeExecutionError
+from utils.errors import AIError
 
 logger = get_logger(__name__)
 
-
 class CodeGenerator:
-    """Generates code from natural language descriptions"""
-    
-    LANGUAGE_PROMPTS = {
-        "python": "Generate Python code that",
-        "javascript": "Generate JavaScript code that",
-        "java": "Generate Java code that",
-        "go": "Generate Go code that",
-        "rust": "Generate Rust code that",
-    }
+    """Generates and executes code"""
     
     def __init__(self):
         """Initialize code generator"""
-        self.llm = get_llm_manager()
-        self.generation_history = []
+        self.llm = get_llm()
+        self.validator = CodeValidator()
+        self.executor = CodeExecutor()
+        self.history = []
+        logger.info("Code Generator initialized")
     
-    def generate(
-        self,
-        description: str,
-        language: str = "python",
-        requirements: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Generate code from description
-        
-        Args:
-            description: What the code should do
-            language: Programming language (default: python)
-            requirements: Additional requirements
-            
-        Returns:
-            Generated code with metadata
-            
-        Raises:
-            CodeExecutionError: If generation fails
-        """
+    def generate(self, description: str, language: str = "python") -> Dict[str, Any]:
+        """Generate code from description"""
         try:
-            language = language.lower()
-            if language not in self.LANGUAGE_PROMPTS:
-                raise CodeExecutionError(f"Unsupported language: {language}")
+            prompt = f"""
+Generate clean, well-commented {language} code for the following:
+{description}
+
+Provide only the code, no explanations.
+            """
             
-            prompt = self._build_prompt(description, language, requirements)
             code = self.llm.generate(prompt)
             
-            # Clean code (remove markdown if present)
-            code = self._clean_code(code, language)
+            # Validate code
+            validation = self.validator.validate(code, language)
             
             result = {
-                "language": language,
                 "description": description,
+                "language": language,
                 "code": code,
-                "requirements": requirements,
+                "valid": validation["valid"],
+                "validation": validation
             }
             
-            self.generation_history.append(result)
-            logger.info(f"Generated {language} code")
+            self.history.append(result)
+            logger.info(f"Code generated for: {description[:50]}...")
+            
             return result
+            
         except Exception as e:
-            raise CodeExecutionError(f"Code generation failed: {str(e)}")
+            logger.error(f"Code generation error: {str(e)}")
+            raise AIError(f"Failed to generate code: {str(e)}")
     
-    def _build_prompt(
-        self,
-        description: str,
-        language: str,
-        requirements: Optional[str] = None,
-    ) -> str:
-        """Build generation prompt
-        
-        Args:
-            description: Code description
-            language: Target language
-            requirements: Additional requirements
+    def generate_and_execute(self, description: str, language: str = "python") -> Dict[str, Any]:
+        """Generate and execute code"""
+        try:
+            # Generate code
+            result = self.generate(description, language)
             
-        Returns:
-            Generation prompt
-        """
-        prompt = f"{self.LANGUAGE_PROMPTS[language]} {description}"
-        
-        if requirements:
-            prompt += f"\n\nRequirements:\n{requirements}"
-        
-        prompt += f"\n\nProvide clean, well-commented {language} code. Include docstrings/comments."
-        
-        return prompt
+            if result["valid"]:
+                # Execute code
+                execution = self.executor.execute(result["code"], language)
+                result["execution"] = execution
+            else:
+                result["execution"] = {"success": False, "error": "Code validation failed"}
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error: {str(e)}")
+            raise
     
-    @staticmethod
-    def _clean_code(code: str, language: str) -> str:
-        """Clean generated code
-        
-        Args:
-            code: Raw generated code
-            language: Programming language
-            
-        Returns:
-            Cleaned code
-        """
-        # Remove markdown code blocks if present
-        if f"```{language}" in code:
-            start = code.find(f"```{language}") + len(f"```{language}")
-            end = code.rfind("```")
-            code = code[start:end].strip()
-        elif "```" in code:
-            start = code.find("```") + 3
-            end = code.rfind("```")
-            code = code[start:end].strip()
-        
-        return code.strip()
-    
-    def generate_explanation(
-        self,
-        code: str,
-        language: str = "python",
-    ) -> str:
-        """Generate explanation for code
-        
-        Args:
-            code: Code to explain
-            language: Programming language
-            
-        Returns:
-            Code explanation
-        """
-        prompt = f"""Explain the following {language} code in simple terms:
-        
-{code}
-
-Provide a clear, concise explanation of what this code does."""
-        
+    def generate_explanation(self, code: str) -> str:
+        """Generate explanation for code"""
+        prompt = f"Explain this code in simple terms:\n{code}"
         return self.llm.generate(prompt)
     
-    def get_history(self) -> list:
-        """Get generation history
-        
-        Returns:
-            List of generated code
-        """
-        return self.generation_history
+    def get_history(self):
+        """Get generation history"""
+        return self.history

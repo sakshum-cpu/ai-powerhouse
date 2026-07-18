@@ -1,138 +1,77 @@
-"""Tool definitions and registry for autonomous agent"""
-from typing import Callable, Dict, Any, Optional, List
-from dataclasses import dataclass
+"""Tool registry for agents"""
+import math
+from typing import Callable, Dict, Any
 from utils.logger import get_logger
-from utils.errors import ToolError
 
 logger = get_logger(__name__)
 
-
-@dataclass
-class Tool:
-    """Tool definition"""
-    name: str
-    description: str
-    func: Callable
-    args_schema: Optional[Dict[str, Any]] = None
-
-
 class ToolRegistry:
-    """Registry for managing agent tools"""
+    """Registry for agent tools"""
     
     def __init__(self):
         """Initialize tool registry"""
-        self.tools: Dict[str, Tool] = {}
+        self.tools = {}
         self._register_default_tools()
     
-    def _register_default_tools(self) -> None:
+    def _register_default_tools(self):
         """Register default tools"""
-        # Calculator tool
-        self.register(
-            "calculator",
-            "Performs mathematical calculations",
-            self._calculator,
-            {"expression": "A mathematical expression"}
-        )
-        
-        # Web search tool (mock)
-        self.register(
-            "web_search",
-            "Searches the web for information",
-            self._web_search,
-            {"query": "Search query"}
-        )
+        self.register("calculate", self._calculate, "Perform mathematical calculations")
+        self.register("is_prime", self._is_prime, "Check if a number is prime")
+        self.register("factorial", self._factorial, "Calculate factorial of a number")
+        self.register("random_numbers", self._random_numbers, "Generate random numbers")
     
-    def register(
-        self,
-        name: str,
-        description: str,
-        func: Callable,
-        args_schema: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        """Register a new tool
-        
-        Args:
-            name: Tool name
-            description: Tool description
-            func: Function to execute
-            args_schema: Function arguments schema
-        """
-        tool = Tool(
-            name=name,
-            description=description,
-            func=func,
-            args_schema=args_schema or {},
-        )
-        self.tools[name] = tool
-        logger.info(f"Registered tool: {name}")
+    def register(self, name: str, func: Callable, description: str):
+        """Register a tool"""
+        self.tools[name] = {
+            "function": func,
+            "description": description
+        }
+        logger.info(f"Tool registered: {name}")
     
-    def execute(
-        self,
-        tool_name: str,
-        **kwargs
-    ) -> Any:
-        """Execute a tool
-        
-        Args:
-            tool_name: Name of tool to execute
-            **kwargs: Tool arguments
-            
-        Returns:
-            Tool result
-            
-        Raises:
-            ToolError: If tool execution fails
-        """
+    def execute(self, tool_name: str, *args, **kwargs) -> Any:
+        """Execute a tool"""
         if tool_name not in self.tools:
-            raise ToolError(f"Tool not found: {tool_name}")
+            raise ValueError(f"Tool '{tool_name}' not found")
         
         try:
-            tool = self.tools[tool_name]
-            result = tool.func(**kwargs)
+            result = self.tools[tool_name]["function"](*args, **kwargs)
             logger.info(f"Tool executed: {tool_name}")
             return result
         except Exception as e:
-            raise ToolError(f"Tool execution failed: {str(e)}")
+            logger.error(f"Tool execution error: {str(e)}")
+            raise
     
-    def get_tools(self) -> List[Dict[str, Any]]:
-        """Get all available tools
-        
-        Returns:
-            List of tool definitions
-        """
-        return [
-            {
-                "name": tool.name,
-                "description": tool.description,
-                "args": tool.args_schema,
-            }
-            for tool in self.tools.values()
-        ]
+    def get_tools(self):
+        """Get all registered tools"""
+        return {k: v["description"] for k, v in self.tools.items()}
     
+    # Default tools
     @staticmethod
-    def _calculator(expression: str) -> str:
-        """Simple calculator tool
-        
-        Args:
-            expression: Mathematical expression
-            
-        Returns:
-            Calculation result
-        """
+    def _calculate(expression):
+        """Calculate mathematical expression"""
         try:
-            result = eval(expression)
-            return f"Result: {result}"
+            return eval(str(expression), {"__builtins__": {}}, {})
         except Exception as e:
-            return f"Calculation error: {str(e)}"
+            return f"Error: {str(e)}"
     
     @staticmethod
-    def _web_search(query: str) -> str:
-        """Mock web search tool
-        
-        Args:
-            query: Search query
-            
-        Returns:
-            Mock search results
-        """
-        return f"Search results for: {query} (Mock results)"
+    def _is_prime(n):
+        """Check if number is prime"""
+        n = int(n)
+        if n < 2:
+            return False
+        for i in range(2, int(math.sqrt(n)) + 1):
+            if n % i == 0:
+                return False
+        return True
+    
+    @staticmethod
+    def _factorial(n):
+        """Calculate factorial"""
+        return math.factorial(int(n))
+    
+    @staticmethod
+    def _random_numbers(count, max_val=100):
+        """Generate random numbers"""
+        import random
+        return [random.randint(1, max_val) for _ in range(int(count))]

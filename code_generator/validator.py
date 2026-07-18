@@ -1,89 +1,64 @@
-"""Code validation utilities"""
-from typing import Dict, List, Tuple
+"""Code validation for code generator"""
 import ast
-import re
+from typing import Dict, Any
 from utils.logger import get_logger
+from utils.errors import ValidationError, SecurityError
 
 logger = get_logger(__name__)
-
 
 class CodeValidator:
     """Validates generated code"""
     
     def __init__(self):
-        """Initialize code validator"""
-        self.issues: List[Dict[str, any]] = []
+        """Initialize validator"""
+        self.dangerous_imports = {"os", "subprocess", "sys", "socket", "requests"}
+        self.dangerous_functions = {"eval", "exec", "compile", "__import__"}
     
-    def validate_python(self, code: str) -> Tuple[bool, List[Dict[str, any]]]:
-        """Validate Python code syntax
-        
-        Args:
-            code: Python code to validate
-            
-        Returns:
-            Tuple of (is_valid, issues)
-        """
-        issues = []
-        
+    def validate_python(self, code: str) -> Dict[str, Any]:
+        """Validate Python code"""
         try:
             ast.parse(code)
-            logger.info("Python code syntax is valid")
-            return True, issues
+            logger.info("Python code validation passed")
+            return {"valid": True, "errors": []}
         except SyntaxError as e:
-            issues.append({
-                "type": "syntax_error",
-                "message": str(e),
-                "line": e.lineno,
-            })
-            logger.warning(f"Syntax error: {e}")
-            return False, issues
+            logger.error(f"Syntax error: {str(e)}")
+            return {
+                "valid": False,
+                "errors": [f"Syntax error: {str(e)}"]
+            }
     
-    def check_security(self, code: str) -> Tuple[bool, List[Dict[str, any]]]:
-        """Check code for security issues
-        
-        Args:
-            code: Code to check
-            
-        Returns:
-            Tuple of (is_safe, issues)
-        """
+    def check_security(self, code: str) -> Dict[str, Any]:
+        """Check code for security issues"""
         issues = []
-        dangerous_patterns = [
-            (r'os\.system|subprocess\.call|exec|eval', 'Potentially dangerous system call'),
-            (r'open\(.*[\'\"]w[\'\")', 'File write operation'),
-            (r'import.*shell', 'Shell operation'),
-        ]
         
-        for pattern, description in dangerous_patterns:
-            if re.search(pattern, code):
-                issues.append({
-                    "type": "security_warning",
-                    "message": description,
-                    "pattern": pattern,
-                })
+        # Check for dangerous imports
+        for imp in self.dangerous_imports:
+            if f"import {imp}" in code or f"from {imp}" in code:
+                issues.append(f"Dangerous import: {imp}")
         
-        is_safe = len(issues) == 0
-        if is_safe:
-            logger.info("Code passed security checks")
-        else:
-            logger.warning(f"Security issues found: {len(issues)}")
+        # Check for dangerous functions
+        for func in self.dangerous_functions:
+            if func in code:
+                issues.append(f"Dangerous function: {func}")
         
-        return is_safe, issues
-    
-    def check_quality(self, code: str) -> Dict[str, any]:
-        """Check code quality
+        if issues:
+            logger.warning(f"Security issues found: {issues}")
         
-        Args:
-            code: Code to check
-            
-        Returns:
-            Quality metrics
-        """
-        metrics = {
-            "lines_of_code": len(code.split('\n')),
-            "has_comments": '#' in code,
-            "has_docstrings": '"""' in code or "'''" in code,
-            "avg_line_length": sum(len(line) for line in code.split('\n')) / max(1, len(code.split('\n'))),
+        return {
+            "secure": len(issues) == 0,
+            "issues": issues
         }
+    
+    def validate(self, code: str, language: str = "python") -> Dict[str, Any]:
+        """Full validation"""
+        if language == "python":
+            syntax_check = self.validate_python(code)
+            security_check = self.check_security(code)
+            
+            return {
+                "valid": syntax_check["valid"] and security_check["secure"],
+                "syntax_errors": syntax_check["errors"],
+                "security_issues": security_check["issues"]
+            }
         
-        return metrics
+        return {"valid": True, "message": f"No validation for {language}"}

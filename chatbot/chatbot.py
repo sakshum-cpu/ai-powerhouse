@@ -1,111 +1,66 @@
-"""Main chatbot implementation"""
-from typing import Optional
-from chatbot.memory import ConversationMemory
-from utils.llm import get_llm_manager
+"""Chatbot implementation"""
+from typing import Optional, Dict, Any
+from chatbot.memory import Memory
+from utils.llm import get_llm
 from utils.logger import get_logger
-from utils.errors import ChatbotError
+from utils.errors import AIError
 
 logger = get_logger(__name__)
 
-
 class Chatbot:
-    """Intelligent conversational chatbot"""
+    """Intelligent chatbot with memory management"""
     
-    def __init__(
-        self,
-        name: str = "AI Assistant",
-        system_prompt: Optional[str] = None,
-    ):
-        """Initialize chatbot
-        
-        Args:
-            name: Chatbot name
-            system_prompt: Custom system prompt
-        """
+    def __init__(self, name="NEURON", system_prompt=None):
+        """Initialize chatbot"""
         self.name = name
-        self.system_prompt = system_prompt or self._get_default_system_prompt()
-        self.memory = ConversationMemory()
-        self.llm = get_llm_manager()
-        logger.info(f"Initialized chatbot: {name}")
-    
-    def _get_default_system_prompt(self) -> str:
-        """Get default system prompt
-        
-        Returns:
-            Default system prompt
+        self.memory = Memory()
+        self.system_prompt = system_prompt or f"""
+You are {name}, an intelligent AI assistant. 
+You are helpful, harmless, and honest.
+Provide clear, concise, and accurate responses.
+Remember context from previous conversations.
         """
-        return (
-            "You are a helpful, intelligent AI assistant. "
-            "Provide clear, concise, and accurate responses. "
-            "If you're unsure about something, say so."
-        )
+        self.llm = get_llm()
+        logger.info(f"Chatbot '{name}' initialized")
     
     def chat(self, user_input: str) -> str:
-        """Process user input and generate response
-        
-        Args:
-            user_input: User's message
-            
-        Returns:
-            Chatbot's response
-            
-        Raises:
-            ChatbotError: If chat processing fails
-        """
+        """Chat with the bot"""
         try:
             # Add user message to memory
             self.memory.add_message("user", user_input)
-            logger.debug(f"User: {user_input}")
             
             # Get conversation history
-            messages = self.memory.get_messages()
+            history = self.memory.get_history()
             
-            # Add system prompt as first message if not present
-            if not messages or messages[0]["role"] != "system":
-                messages.insert(0, {
-                    "role": "system",
-                    "content": self.system_prompt,
-                })
+            # Get response from LLM
+            response = self.llm.chat(history, self.system_prompt)
             
-            # Generate response
-            response = self.llm.chat(messages)
-            
-            # Add assistant message to memory
+            # Add assistant response to memory
             self.memory.add_message("assistant", response)
-            logger.debug(f"Assistant: {response}")
             
+            logger.info(f"Chatbot response generated")
             return response
+            
         except Exception as e:
-            raise ChatbotError(f"Chat processing failed: {str(e)}")
+            logger.error(f"Chat error: {str(e)}")
+            raise AIError(f"Failed to generate response: {str(e)}")
     
-    def set_system_prompt(self, prompt: str) -> None:
-        """Update system prompt
-        
-        Args:
-            prompt: New system prompt
-        """
-        self.system_prompt = prompt
-        logger.info("System prompt updated")
+    def get_history(self):
+        """Get conversation history"""
+        return self.memory.get_all()
     
-    def clear_history(self) -> None:
+    def clear_history(self):
         """Clear conversation history"""
         self.memory.clear()
         logger.info("Conversation history cleared")
     
-    def get_history(self) -> list:
-        """Get conversation history
-        
-        Returns:
-            List of messages
-        """
-        return self.memory.get_messages()
-    
-    def get_stats(self) -> dict:
-        """Get chatbot statistics
-        
-        Returns:
-            Dictionary with stats
-        """
-        stats = self.memory.get_summary()
+    def get_stats(self) -> Dict[str, Any]:
+        """Get chatbot statistics"""
+        stats = self.memory.get_stats()
         stats["name"] = self.name
         return stats
+    
+    def set_system_prompt(self, prompt: str):
+        """Update system prompt"""
+        self.system_prompt = prompt
+        logger.info("System prompt updated")

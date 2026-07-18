@@ -1,88 +1,49 @@
-"""Conversation memory management for chatbot"""
-from typing import List, Dict, Optional
+"""Memory management for chatbot"""
+from typing import List, Dict
 from datetime import datetime
 from config import settings
-from utils.logger import get_logger
 
-logger = get_logger(__name__)
-
-
-class ConversationMemory:
-    """Manages conversation history and context"""
+class Memory:
+    """Manages conversation memory"""
     
-    def __init__(self, max_size: Optional[int] = None):
-        """Initialize conversation memory
-        
-        Args:
-            max_size: Maximum number of messages to keep
-        """
+    def __init__(self, max_size=None):
+        """Initialize memory"""
         self.max_size = max_size or settings.chatbot_memory_size
-        self.messages: List[Dict[str, any]] = []
+        self.messages = []
+        self.metadata = {}
     
-    def add_message(self, role: str, content: str) -> None:
-        """Add a message to memory
-        
-        Args:
-            role: 'user', 'assistant', or 'system'
-            content: Message content
-        """
+    def add_message(self, role, content, metadata=None):
+        """Add message to memory"""
         message = {
             "role": role,
             "content": content,
             "timestamp": datetime.now().isoformat(),
+            "metadata": metadata or {}
         }
         self.messages.append(message)
         
-        # Remove oldest messages if exceeding max size
+        # Keep only recent messages
         if len(self.messages) > self.max_size:
-            removed = self.messages.pop(0)
-            logger.debug(f"Removed oldest message: {removed['role']} at {removed['timestamp']}")
+            self.messages.pop(0)
     
-    def get_messages(self) -> List[Dict[str, str]]:
-        """Get all messages in memory
-        
-        Returns:
-            List of messages
-        """
-        return [{
-            "role": msg["role"],
-            "content": msg["content"],
-        } for msg in self.messages]
+    def get_history(self, window_size=None):
+        """Get message history"""
+        size = window_size or settings.chatbot_context_window
+        return self.messages[-size:]
     
-    def get_context(self, window_size: Optional[int] = None) -> str:
-        """Get recent conversation context
-        
-        Args:
-            window_size: Number of recent messages to include
-            
-        Returns:
-            Formatted context string
-        """
-        window = window_size or settings.chatbot_context_window
-        recent_messages = self.messages[-window:]
-        
-        context = ""
-        for msg in recent_messages:
-            role = msg["role"].upper()
-            content = msg["content"]
-            context += f"{role}: {content}\n"
-        
-        return context
+    def get_all(self):
+        """Get all messages"""
+        return self.messages
     
-    def clear(self) -> None:
-        """Clear all messages from memory"""
-        self.messages.clear()
-        logger.info("Conversation memory cleared")
+    def clear(self):
+        """Clear memory"""
+        self.messages = []
     
-    def get_summary(self) -> Dict[str, any]:
-        """Get memory statistics
-        
-        Returns:
-            Dictionary with memory stats
-        """
+    def get_stats(self):
+        """Get memory statistics"""
         return {
             "total_messages": len(self.messages),
-            "max_size": self.max_size,
-            "first_message_time": self.messages[0]["timestamp"] if self.messages else None,
-            "last_message_time": self.messages[-1]["timestamp"] if self.messages else None,
+            "user_messages": len([m for m in self.messages if m["role"] == "user"]),
+            "assistant_messages": len([m for m in self.messages if m["role"] == "assistant"]),
+            "memory_size": self.max_size
         }

@@ -1,84 +1,45 @@
-"""Task planning for autonomous agent"""
-from typing import Dict, List, Any, Optional
-from utils.llm import get_llm_manager
+"""Task planning for agents"""
+from typing import List, Dict, Any
+from utils.llm import get_llm
 from utils.logger import get_logger
-import json
 
 logger = get_logger(__name__)
 
-
 class TaskPlanner:
-    """Plans tasks into executable steps"""
+    """Plans task execution steps"""
     
     def __init__(self):
-        """Initialize task planner"""
-        self.llm = get_llm_manager()
+        """Initialize planner"""
+        self.llm = get_llm()
     
-    def plan(
-        self,
-        task: str,
-        available_tools: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
-        """Plan a task into steps
+    def plan(self, task: str, available_tools: List[str]) -> Dict[str, Any]:
+        """Create execution plan for task"""
+        tools_str = ", ".join(available_tools)
         
-        Args:
-            task: Task description
-            available_tools: List of available tools
-            
-        Returns:
-            Plan with steps
-        """
-        available_tools = available_tools or []
-        
-        tools_description = "\n".join([
-            f"- {tool['name']}: {tool['description']}"
-            for tool in available_tools
-        ])
-        
-        prompt = f"""Plan the following task into executable steps.
-        
+        prompt = f"""
+Break down this task into clear, executable steps:
 Task: {task}
 
-Available tools:
-{tools_description}
+Available tools: {tools_str}
 
-Create a detailed plan with the following JSON format:
-{{
-    "goal": "Task goal",
-    "steps": [
-        {{
-            "step_number": 1,
-            "description": "Step description",
-            "action": "think" or "use_tool",
-            "tool": "tool_name_if_applicable",
-            "args": {{}}
-        }}
-    ]
-}}
-
-Respond only with valid JSON."""
+Provide a step-by-step plan. Format each step as:
+Step 1: [description]
+Step 2: [description]
+etc.
+        """
         
-        try:
-            response = self.llm.generate(prompt)
-            # Extract JSON from response
-            import re
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
-            if json_match:
-                plan = json.loads(json_match.group())
-                logger.info(f"Plan created with {len(plan.get('steps', []))} steps")
-                return plan
-        except Exception as e:
-            logger.error(f"Planning failed: {str(e)}")
+        plan_text = self.llm.generate(prompt)
         
-        # Fallback plan
+        # Parse plan
+        steps = []
+        for line in plan_text.split('\n'):
+            if line.strip().startswith('Step'):
+                steps.append(line.strip())
+        
+        logger.info(f"Task plan created with {len(steps)} steps")
+        
         return {
-            "goal": task,
-            "steps": [
-                {
-                    "step_number": 1,
-                    "description": task,
-                    "action": "think",
-                    "prompt": task,
-                }
-            ]
+            "task": task,
+            "steps": steps,
+            "plan_text": plan_text
         }

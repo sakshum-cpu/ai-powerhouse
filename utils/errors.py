@@ -1,31 +1,25 @@
 """Custom exceptions for AI Powerhouse"""
 
-
 class AIError(Exception):
-    """Base exception for all AI Powerhouse errors"""
+    """Base exception for AI Powerhouse"""
     pass
-
 
 class LLMError(AIError):
-    """Raised when LLM interaction fails"""
+    """LLM related errors"""
     pass
 
-
-class AgentError(AIError):
-    """Raised when agent execution fails"""
+class ValidationError(AIError):
+    """Validation errors"""
     pass
 
-
-class CodeExecutionError(AIError):
-    """Raised when code execution fails"""
+class ExecutionError(AIError):
+    """Execution errors"""
     pass
 
-
-class ChatbotError(AIError):
-    """Raised when chatbot operation fails"""
+class ConfigError(AIError):
+    """Configuration errors"""
     pass
 
-
-class ToolError(AgentError):
-    """Raised when a tool execution fails"""
+class SecurityError(AIError):
+    """Security related errors"""
     pass
